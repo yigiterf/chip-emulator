@@ -1,0 +1,4 @@
+build/
+chip8
+*.o
+docs/
