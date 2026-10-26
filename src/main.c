@@ -1,18 +1,22 @@
 /*
  * main.c - Entry point of the CHIP-8 emulator.
  *
- * Stage 2: we can fetch instructions from memory and decode them
- * (mini disassembler). Real execution comes next.
+ * Stage 3: real execution. The machine can now run programs:
+ * registers change, PC jumps, the stack works.
  *
- * Two ways to run:
- *   ./chip8 <rom>            -> machine state + memory dumps
- *   ./chip8 --trace <rom>    -> fetch loop: list every instruction
+ * Ways to run:
+ *   ./chip8 <rom>                  -> machine state + memory dumps
+ *   ./chip8 --trace <rom>          -> disassembler (no execution)
+ *   ./chip8 --run <rom>            -> execute up to MAX_CYCLES instructions
+ *   ./chip8 --run --trace <rom>    -> execute, printing each instruction
  */
 
 #include <stdio.h>
 #include <string.h>   /* strcmp: compare two strings for equality */
 
 #include "chip8.h"
+
+#define MAX_CYCLES 1000   /* safety net: stops even endless JMP loops */
 
 /*
  * Translate one opcode into human-readable text ("mnemonic").
@@ -34,12 +38,26 @@ static void print_mnemonic(uint16_t opcode)
     case 0x0:
         if (opcode == 0x00E0)
             printf("CLS             ; clear screen");
+        else if (opcode == 0x00EE)
+            printf("RET             ; return from subroutine");
         else
-            printf("? (n1=0, but not CLS)");
+            printf("? (n1=0, but not CLS/RET)");
         break;
 
     case 0x1:
         printf("JMP  0x%03X          ; jump to address", NNN);
+        break;
+
+    case 0x2:
+        printf("CALL 0x%03X          ; call subroutine", NNN);
+        break;
+
+    case 0x3:
+        printf("SE   V%X, 0x%02X      ; skip next if V%X == %u", n2, NN, n2, NN);
+        break;
+
+    case 0x4:
+        printf("SNE  V%X, 0x%02X      ; skip next if V%X != %u", n2, NN, n2, NN);
         break;
 
     case 0x6:
@@ -48,6 +66,10 @@ static void print_mnemonic(uint16_t opcode)
 
     case 0x7:
         printf("ADD  V%X, 0x%02X      ; register V%X += %u", n2, NN, n2, NN);
+        break;
+
+    case 0xA:
+        printf("LDI  0x%03X          ; I = 0x%03X", NNN, NNN);
         break;
 
     default:
@@ -80,21 +102,64 @@ static void trace(const struct chip8 *machine)
     }
 }
 
+/*
+ * Run mode: actually EXECUTE instructions, optionally printing each
+ * one as it is about to run. Stops on unknown opcodes, stack errors,
+ * or when MAX_CYCLES is reached (real games never "end" - they loop).
+ */
+static void run(struct chip8 *machine, int trace)
+{
+    for (int cycle = 0; cycle < MAX_CYCLES; cycle++) {
+        uint16_t pc = machine->pc;
+        uint16_t opcode = chip8_fetch(machine, pc);
+
+        if (trace) {
+            /* Cap the output: a game in an endless loop would print
+               thousands of lines. First 40 are plenty for debugging. */
+            static int lines = 0;
+            if (lines == 40)
+                printf("... (trace output limited to first 40 lines)\n");
+            if (lines < 40) {
+                printf("%04X:  %04X    ", pc, opcode);
+                print_mnemonic(opcode);
+                printf("\n");
+            }
+            lines++;
+        }
+
+        int err = chip8_step(machine);
+        if (err == -1) {
+            printf("\nstopped: unknown opcode %04X at %04X\n", opcode, pc);
+            return;
+        }
+        if (err == -2) {
+            printf("\nstopped: stack overflow/underflow at %04X\n", pc);
+            return;
+        }
+    }
+
+    printf("(stopped after %d cycles - probably an endless loop, which is normal)\n",
+           MAX_CYCLES);
+}
+
 int main(int argc, char *argv[])
 {
-    /* argv handling: pick the ROM path, notice the optional --trace flag. */
+    /* argv handling: pick the ROM path, notice the optional flags. */
     const char *rom_path = NULL;
     int trace_mode = 0;
+    int run_mode = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--trace") == 0)
             trace_mode = 1;
+        else if (strcmp(argv[i], "--run") == 0)
+            run_mode = 1;
         else
             rom_path = argv[i];
     }
 
     if (rom_path == NULL) {
-        fprintf(stderr, "Usage: %s [--trace] <rom-file>\n", argv[0]);
+        fprintf(stderr, "Usage: %s [--run] [--trace] <rom-file>\n", argv[0]);
         return 1;
     }
 
@@ -109,7 +174,11 @@ int main(int argc, char *argv[])
     printf("machine reset: pc=0x%03X, rom '%s' (%u bytes)\n",
            machine.pc, rom_path, machine.prog_size);
 
-    if (trace_mode) {
+    if (run_mode) {
+        run(&machine, trace_mode);
+        printf("\nregisters after run:\n");
+        chip8_print_registers(&machine);
+    } else if (trace_mode) {
         trace(&machine);
     } else {
         printf("\n--- font area (0x050) ---\n");

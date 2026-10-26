@@ -111,6 +111,90 @@ uint16_t chip8_fetch(const struct chip8 *c, uint16_t pc)
     return (uint16_t)((c->memory[pc] << 8) | c->memory[pc + 1]);
 }
 
+void chip8_print_registers(const struct chip8 *c)
+{
+    for (int i = 0; i < 16; i++) {
+        if (i % 4 == 0)
+            printf("\n  ");
+        printf("V%X=%02X  ", i, c->V[i]);
+    }
+    printf("\n  I=0x%03X  PC=0x%03X  SP=%u\n", c->I, c->pc, c->sp);
+}
+
+int chip8_step(struct chip8 *c)
+{
+    uint16_t opcode = chip8_fetch(c, c->pc);
+
+    /* Pull the opcode apart (see lesson 2 on masking). */
+    uint8_t n1   = (opcode & 0xF000) >> 12;
+    uint8_t x    = (opcode & 0x0F00) >>  8;  /* usually a register #   */
+    uint8_t NN   =  opcode & 0x00FF;         /* low byte, 8-bit const  */
+    uint16_t NNN =  opcode & 0x0FFF;         /* low 12 bits, address   */
+
+    /* DEFAULT: move to the next instruction. Jumps/calls overwrite
+       this below. One default, then a switch - no per-case PC juggling. */
+    c->pc += 2;
+
+    switch (n1) {
+    case 0x0:
+        if (opcode == 0x00EE) {
+            /* RET: pop the return address. `sp` counts used entries:
+               push writes at sp then increments, pop decrements then reads. */
+            if (c->sp == 0)
+                return -2;              /* stack underflow (empty stack) */
+            c->sp--;
+            c->pc = c->stack[c->sp];
+        } else if (opcode != 0x00E0) {
+            /* Only 00E0 (CLS) and 00EE (RET) exist with n1=0.
+               0x0000 is NOT a real instruction - refusing it loudly
+               saved us from silently executing empty memory. */
+            return -1;
+        }
+        /* 00E0 (clear screen) is a no-op until we have a framebuffer. */
+        break;
+
+    case 0x1:   /* JMP NNN: overwrite PC */
+        c->pc = NNN;
+        break;
+
+    case 0x2:   /* CALL NNN: push current PC, then jump */
+        if (c->sp >= STACK_SIZE)
+            return -2;                  /* stack overflow */
+        c->stack[c->sp] = c->pc;
+        c->sp++;
+        c->pc = NNN;
+        break;
+
+    case 0x3:   /* SE VX,NN: skip next instruction if equal */
+        if (c->V[x] == NN)
+            c->pc += 2;
+        break;
+
+    case 0x4:   /* SNE VX,NN: skip next instruction if not equal */
+        if (c->V[x] != NN)
+            c->pc += 2;
+        break;
+
+    case 0x6:   /* SET VX,NN */
+        c->V[x] = NN;
+        break;
+
+    case 0x7:   /* ADD VX,NN - wraps at 0x100, no carry flag here */
+        c->V[x] = (uint8_t)(c->V[x] + NN);
+        break;
+
+    case 0xA:   /* LD I,NNN: set the address register */
+        c->I = NNN;
+        break;
+
+    default:
+        c->pc -= 2;   /* rewind: unknown opcode, PC stays where it was */
+        return -1;
+    }
+
+    return 0;
+}
+
 void chip8_dump(const struct chip8 *c, uint16_t start, uint16_t len)
 {
     /* Classic hex-dump format:

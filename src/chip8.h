@@ -46,6 +46,11 @@ struct chip8 {
 };
 
 /*
+ * Print a compact summary of all registers (debug helper).
+ */
+void chip8_print_registers(const struct chip8 *c);
+
+/*
  * Reset the machine: clear memory, load the font sprites, set PC to 0x200.
  */
 void chip8_init(struct chip8 *c);
@@ -55,6 +60,13 @@ void chip8_init(struct chip8 *c);
  * Returns 0 on success, or a negative value on failure (file missing/too big).
  */
 int chip8_load_rom(struct chip8 *c, const char *path);
+
+/*
+ * Execute ONE instruction at the current PC.
+ * Returns 0 on success, -1 if the opcode is unknown.
+ * The PC normally advances by 2 first; jumps/calls overwrite it.
+ */
+int chip8_step(struct chip8 *c);
 
 /*
  * Read the 2-byte instruction at address `pc` and return it as one
