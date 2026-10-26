@@ -57,6 +57,12 @@ void chip8_init(struct chip8 *c);
 int chip8_load_rom(struct chip8 *c, const char *path);
 
 /*
+ * Read the 2-byte instruction at address `pc` and return it as one
+ * 16-bit number. CHIP-8 is BIG-ENDIAN: the high byte is stored first.
+ */
+uint16_t chip8_fetch(const struct chip8 *c, uint16_t pc);
+
+/*
  * Print `len` bytes of memory starting at address `start` as hex.
  * start and len are uint16_t so we can dump any region up to 0xFFFF.
  */

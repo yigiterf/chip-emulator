@@ -101,6 +101,16 @@ int chip8_load_rom(struct chip8 *c, const char *path)
     return 0;
 }
 
+uint16_t chip8_fetch(const struct chip8 *c, uint16_t pc)
+{
+    /* An instruction is 2 bytes, stored BIG-ENDIAN (high byte first):
+         memory[pc]   = 0x6A   ->  high byte
+         memory[pc+1] = 0x02   ->  low byte
+       Combine them: shift the high byte 8 bits left (x256) and OR the
+       low byte into the empty space. Result for this example: 0x6A02. */
+    return (uint16_t)((c->memory[pc] << 8) | c->memory[pc + 1]);
+}
+
 void chip8_dump(const struct chip8 *c, uint16_t start, uint16_t len)
 {
     /* Classic hex-dump format:
