@@ -1,16 +1,14 @@
 # Chip-Emulator
 
-Bir CHIP-8 emülatörü yazma macerası. Amaç, hazır tek satırlik "emülatör çerçevesi"
-kullanmadan, en alttan (bellek, opcode, fetch-decode-execute döngüsü) başlayıp adım
-adım yukarı çıkmak. Bu proje aynı zamanda C, derleme süreci ve bilgisayar
-mimarisinin temelleri üzerine yazılmış bir not defteri.
+C ile yazılmış, bağımlılığı yalnızca [SDL2](https://www.libsdl.org/) olan bir
+CHIP-8 emülatörü. 35 opcode'un tamamını, 4 KB belleği, 64×32 ekranı, klavyeyi
+ve sesi uygular. Sıfırdan, hazır emülatör çatısı kullanmadan yazılmıştır.
 
 ## CHIP-8 nedir?
 
 CHIP-8, 1970'lerde oyun yazmayı kolaylaştırmak için tasarlanmış basit bir
-"sanal makine" (VM). Çok küçüktür — yalnızca ~35 opcode, 16 genel amaçlı
-register, 4 KB bellek ve 64×32 monokrom ekran — ama yaptığı iş, gerçek bir
-işlemcinin yaptığının aynısıdır:
+"sanal makine"dir (VM). Çok küçüktür ama yaptığı iş gerçek bir işlemcininkiyle
+aynıdır:
 
 ```
    ┌──────────────────────┐
@@ -22,49 +20,63 @@ işlemcinin yaptığının aynısıdır:
 ```
 
 Bir emülatör, bu döngüyü başka bir bilgisayarda taklit eden programdır.
-CHIP-8 yazmak, gerçek CPU'ların karmaşıklığına (pipeline, MMU, 32/64-bit
-detaylar) boğulmadan bu fikri öğrenmenin en kısa yoludur.
 
-## Nasıl derlenir?
+## Derleme
+
+SDL2 gereklidir:
 
 ```bash
+# Debian/Ubuntu
+sudo apt install libsdl2-dev
+
 make          # ./chip8 üretir
 make clean    # build/ ve chip8'i siler
 ```
 
-Faz 3'ten (grafik) itibaren SDL2 gerekecek:
+## Kullanım
 
 ```bash
-sudo apt install libsdl2-dev
+./chip8 roms/pong2.ch8               # SDL penceresinde oynat
+./chip8 --trace roms/ibm_logo.ch8    # disassembler (komutları listele)
+./chip8 --run roms/flow.ch8          # başsız çalıştır + register özeti
+./chip8 --gfx roms/ibm_logo.ch8      # başsız çalıştır + ekranı ASCII bas
 ```
 
-## Nasıl çalıştırılır?
+### Klavye eşlemesi
 
-```bash
-./chip8 <rom-dosyasi>.ch8
 ```
+CHIP-8:  1 2 3 C          Klavye:  1 2 3 4
+         4 5 6 D                   Q W E R
+         7 8 9 E                   A S D F
+         A 0 B F                   Z X C V
+```
+
+`Esc` veya pencereyi kapatmak çıkıştır.
 
 ## Yapı
 
-- `src/`  — C kaynak kodu
-- `docs/` — Öğrenme sürecinde yazılan ders notları (kişisel, git'e girmez)
-- `roms/` — Denenecek CHIP-8 ROM'ları
+- `src/chip8.h`, `src/chip8.c` — makinenin kendisi (bellek, CPU, opcode'lar).
+  Hiçbir kütüphane bilmez; SDL'siz derlenip test edilebilir.
+- `src/main.c` — arayüz: SDL penceresi, klavye, ses ve `--trace/--run/--gfx`
+  araçları.
+- `roms/` — örnek ROM'lar (Pong, Space Invaders, Tetris, Breakout, test ROM'ları).
+
+## ROM'lar
+
+`roms/` içindeki oyunlar ve test ROM'ları çeşitli açık kaynak koleksiyonlardan
+alınmıştır; CHIP-8 ROM'ları genellikle kamu malı sayılır. Kendi ROM'unu
+`./chip8 roms/senin-romun.ch8` ile yükleyebilirsin.
 
 ## Durum
 
-- ✅ Faz 0 — Derleme zinciri, Makefile, ilk `main.c`
-- ⏳ Faz 1 — Bellek ve CPU iskeleti
-- ⬜ Faz 2 — Opcode'ların çözülmesi
-- ⬜ Faz 3 — SDL2: pencere, klavye, ekran
-- ⬜ Faz 4 — Timer, ses
-- ⬜ Faz 5 — Bonuslar
+- [x] Tüm 35 opcode
+- [x] 4 KB bellek, 16 register, stack, timer'lar
+- [x] 64×32 framebuffer + SDL2 (12x ölçekli)
+- [x] Klavye (16 tuş) ve ses (kare dalga)
+- [x] Debug araçları: disassembler, register özeti, ekran dump'ı
 
-Ayrıntılı yol haritası: `docs/PLAN.md`
+## Neden CHIP-8?
 
-## Neden tam olarak CHIP-8?
-
-- Gerçek bir CPU öykünmek için yeterince gerçek, boğulmayacak kadar basit.
-- Hazır oyunları (Pong, Tetris, Space Invaders...) ve test ROM'ları var.
-- C'nin en çetrefilli konularına — pointerlar, bit işlemleri, `struct`
-  bellek düzeni, unsigned aritmetik, big-endian veri — projenin doğal
-  ihtiyacı olarak ulaşılır; yapay alıştırmalara gerek kalmaz.
+Gerçek bir CPU öykünmek için yeterince gerçek, boğulmayacak kadar basit.
+C'nin en çetrefilli konularına — pointerlar, bit işlemleri, unsigned aritmetik,
+big-endian veri, kaynak yönetimi — projenin doğal ihtiyacı olarak ulaşılır.
