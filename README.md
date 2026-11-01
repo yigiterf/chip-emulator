@@ -61,6 +61,14 @@ CHIP-8:  1 2 3 C          Klavye:  1 2 3 4
   araçları.
 - `roms/` — örnek ROM'lar (Pong, Space Invaders, Tetris, Breakout, test ROM'ları).
 
+## Dokümantasyon
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — projenin çalışma mantığı baştan
+  sona: mimari katmanlar, bellek haritası, fetch-decode-execute döngüsü,
+  35 opcode tablosu, ekran/klavye/ses/zamanlama, hata yönetimi, debug
+  araçları, test yöntemi ve genişletme notları. Kodu okumadan önce buraya
+  göz atmanı öneririm.
+
 ## ROM'lar
 
 `roms/` içindeki oyunlar ve test ROM'ları çeşitli açık kaynak koleksiyonlardan
